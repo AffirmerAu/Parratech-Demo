@@ -1,0 +1,26 @@
+{
+  "site": "Parratech – Khu công trường Kings Park",
+  "locale": "vi-VN",
+  "playlist": [
+    {
+      "id": "01_Introduction",
+      "src": "/videos/01_Introduction.mp4",
+      "line": "Xin chào và chào mừng bạn đến với công trường Kings Park của Parratech."
+    },
+    {
+      "id": "03_Assembly_Area",
+      "src": "/videos/03_Assembly_Area.mp4",
+      "line": "Nếu có tình huống khẩn cấp cần sơ tán, hãy di chuyển nhanh nhưng bình tĩnh đến lối thoát hiểm gần nhất và tới khu vực tập trung quy định."
+    },
+    {
+      "id": "04_Assembly_Area_Primary",
+      "src": "/videos/04_Assembly_Area_Primary.mp4",
+      "line": "Điểm tập trung chính nằm tại Cổng vào B trên vỉa hè."
+    },
+    {
+      "id": "05_Assembly_Area_Secondary",
+      "src": "/videos/05_Assembly_Area_Secondary.mp4",
+      "line": "Điểm tập trung dự phòng nằm dọc hàng rào phía sau công trường."
+    }
+  ]
+}
