@@ -17,7 +17,6 @@ import { parse, type CommandAction } from './commands';
 
 const SUPPORTED_LANGUAGES: { value: string; label: string }[] = [
   { value: 'en', label: 'English (Australia)' },
-  { value: 'vi', label: 'Tiếng Việt' },
 ];
 
 const createId = () =>
@@ -34,9 +33,7 @@ const createEntry = (role: TranscriptEntry['role'], text: string): TranscriptEnt
 
 function App() {
   const searchParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
-  const defaultLanguage = SUPPORTED_LANGUAGES[0]?.value || 'en';
-  const paramLang = searchParams.get('lang');
-  const initialLang = paramLang && paramLang.trim().length > 0 ? paramLang : defaultLanguage;
+  const initialLang = searchParams.get('lang') || SUPPORTED_LANGUAGES[0]?.value || 'en';
 
   const [lang, setLang] = useState(initialLang);
   const [playlist, setPlaylist] = useState<Playlist | null>(null);
@@ -66,14 +63,6 @@ function App() {
     const newUrl = `${window.location.pathname}?${params.toString()}`;
     window.history.replaceState(null, '', newUrl);
   }, [lang]);
-
-  const languageOptions = useMemo(() => {
-    if (SUPPORTED_LANGUAGES.some((option) => option.value === lang)) {
-      return SUPPORTED_LANGUAGES;
-    }
-    const derivedLabel = playlist?.locale ? `${playlist.locale}` : lang;
-    return [...SUPPORTED_LANGUAGES, { value: lang, label: derivedLabel }];
-  }, [lang, playlist]);
 
   useEffect(() => {
     let active = true;
@@ -371,7 +360,7 @@ function App() {
                     <SelectValue placeholder="Select language" />
                   </SelectTrigger>
                   <SelectContent>
-                    {languageOptions.map((language) => (
+                    {SUPPORTED_LANGUAGES.map((language) => (
                       <SelectItem key={language.value} value={language.value}>
                         {language.label}
                       </SelectItem>
