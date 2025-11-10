@@ -147,8 +147,20 @@ export class RealtimeClient extends EventTarget {
     const payload = {
       type: 'response.create',
       response: {
-        instructions: text,
         modalities: ['audio', 'text'],
+        conversation: {
+          messages: [
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'input_text',
+                  text,
+                },
+              ],
+            },
+          ],
+        },
       },
     };
 
