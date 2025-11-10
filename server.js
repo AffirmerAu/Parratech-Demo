@@ -21,6 +21,40 @@ app.use(express.json());
 const distPath = path.resolve(__dirname, 'dist');
 app.use(express.static(distPath));
 
+function buildRealtimeSessionHeaders() {
+  return {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${OPENAI_API_KEY}`,
+    'OpenAI-Beta': 'realtime=v1',
+  };
+}
+
+async function createRealtimeSession(model, instructions) {
+  const response = await fetch('https://api.openai.com/v1/realtime/sessions', {
+    method: 'POST',
+    headers: buildRealtimeSessionHeaders(),
+    body: JSON.stringify({
+      model,
+      instructions,
+      voice: 'verse',
+      modalities: ['audio', 'text'],
+      input_audio_format: 'wav',
+      output_audio_format: 'wav',
+    }),
+  });
+
+  if (response.ok) {
+    return { ok: true, data: await response.json() };
+  }
+
+  const errorText = await response.text();
+  return {
+    ok: false,
+    status: response.status,
+    detail: errorText,
+  };
+}
+
 app.get('/session', async (req, res) => {
   if (!OPENAI_API_KEY) {
     return res.status(500).json({ error: 'Missing OPENAI_API_KEY on the server.' });
@@ -49,14 +83,32 @@ app.get('/session', async (req, res) => {
       }),
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Failed to create realtime session:', response.status, errorText);
-      return res.status(500).json({ error: 'Failed to create realtime session', details: errorText });
+      attempts.push({ model, status: result.status, detail: result.detail });
+
+      const shouldRetry = result.status === 404 || result.status === 422 || result.status === 400;
+      if (!shouldRetry) {
+        break;
+      }
     }
 
-    const data = await response.json();
-    res.json(data);
+    const attemptSummary = attempts
+      .map((attempt) => {
+        const parts = [
+          `[${attempt.model}]`,
+          typeof attempt.status === 'number' ? `status ${attempt.status}` : 'unknown status',
+        ];
+        if (attempt.detail) {
+          parts.push(attempt.detail);
+        }
+        return parts.join(' ');
+      })
+      .join(' | ');
+
+    console.error('Failed to create realtime session:', attemptSummary);
+    res.status(500).json({
+      error: 'Failed to create realtime session',
+      details: attemptSummary || 'Unknown error while creating realtime session.',
+    });
   } catch (error) {
     console.error('Realtime session error:', error);
     res.status(500).json({ error: 'Failed to contact OpenAI Realtime API' });

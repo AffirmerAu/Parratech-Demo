@@ -238,9 +238,23 @@ function App() {
 
     try {
       const response = await fetch(`/session?lang=${encodeURIComponent(lang)}&site=${encodeURIComponent(site)}`);
-      const payload = (await response.json()) as SessionInfo & { error?: string };
-      if (!response.ok || (payload as { error?: string }).error) {
-        throw new Error(payload.error || 'Failed to create realtime session.');
+      const payload = ((await response.json().catch(() => null)) ?? null) as
+        | (SessionInfo & { error?: string; details?: unknown })
+        | null;
+
+      if (!response.ok || (payload && 'error' in payload && payload.error)) {
+        const baseError =
+          (payload && 'error' in payload && typeof payload.error === 'string' && payload.error) ||
+          `Failed to create realtime session (status ${response.status}).`;
+        const details =
+          payload && 'details' in payload && typeof payload.details === 'string'
+            ? payload.details
+            : null;
+        throw new Error(details ? `${baseError} ${details}` : baseError);
+      }
+
+      if (!payload) {
+        throw new Error('Realtime session response was empty.');
       }
 
       const client = await createRealtimeClient(payload, audioEl);
