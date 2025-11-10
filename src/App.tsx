@@ -1,4 +1,4 @@
-import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Card,
   CardContent,
@@ -15,11 +15,8 @@ import { Playlist, SessionInfo, TranscriptEntry } from './types';
 import { createRealtimeClient, RealtimeClient } from './realtime';
 import { parse, type CommandAction } from './commands';
 
-type LanguageOption = { value: string; label: string };
-
-const SUPPORTED_LANGUAGES: LanguageOption[] = [
+const SUPPORTED_LANGUAGES: { value: string; label: string }[] = [
   { value: 'en', label: 'English (Australia)' },
-  { value: 'vi', label: 'Tiếng Việt' },
 ];
 
 const createId = () =>
@@ -36,9 +33,7 @@ const createEntry = (role: TranscriptEntry['role'], text: string): TranscriptEnt
 
 function App() {
   const searchParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
-  const defaultLanguage = SUPPORTED_LANGUAGES[0]?.value || 'en';
-  const paramLang = searchParams.get('lang');
-  const initialLang = paramLang && paramLang.trim().length > 0 ? paramLang : defaultLanguage;
+  const initialLang = searchParams.get('lang') || SUPPORTED_LANGUAGES[0]?.value || 'en';
 
   const [lang, setLang] = useState(initialLang);
   const [playlist, setPlaylist] = useState<Playlist | null>(null);
@@ -69,14 +64,6 @@ function App() {
     window.history.replaceState(null, '', newUrl);
   }, [lang]);
 
-  const languageOptions = useMemo<LanguageOption[]>(() => {
-    if (SUPPORTED_LANGUAGES.some((option) => option.value === lang)) {
-      return SUPPORTED_LANGUAGES;
-    }
-    const derivedLabel = playlist?.locale ? `${playlist.locale}` : lang;
-    return [...SUPPORTED_LANGUAGES, { value: lang, label: derivedLabel }];
-  }, [lang, playlist]);
-
   useEffect(() => {
     let active = true;
     setLoadingPlaylist(true);
@@ -94,7 +81,7 @@ function App() {
         }
         return (await response.json()) as Playlist;
       })
-      .then((data: Playlist) => {
+      .then((data) => {
         if (!active) return;
         setPlaylist(data);
         setCurrentIndex(0);
@@ -103,7 +90,7 @@ function App() {
           setSiteInput(data.site);
         }
       })
-      .catch((error: unknown) => {
+      .catch((error) => {
         if (!active) return;
         console.error('Failed to load playlist', error);
         setPlaylist(null);
@@ -120,7 +107,7 @@ function App() {
   }, [lang, siteTouched]);
 
   const appendTranscript = useCallback((role: TranscriptEntry['role'], text: string) => {
-    setTranscripts((prevEntries) => [...prevEntries, createEntry(role, text)]);
+    setTranscripts((prev) => [...prev, createEntry(role, text)]);
   }, []);
 
   const handleReplay = useCallback(() => {
@@ -134,23 +121,23 @@ function App() {
     if (item && isSessionActive && clientRef.current) {
       clientRef.current
         .speak(item.line)
-        .catch((error: unknown) => console.error('Failed to replay line', error));
+        .catch((error) => console.error('Failed to replay line', error));
     }
   }, [currentIndex, isSessionActive, playlist]);
 
   const handleNext = useCallback(() => {
     if (!playlist) return;
-    setCurrentIndex((prevIndex) => {
-      const next = Math.min(prevIndex + 1, playlist.playlist.length - 1);
-      return next === prevIndex ? prevIndex : next;
+    setCurrentIndex((prev) => {
+      const next = Math.min(prev + 1, playlist.playlist.length - 1);
+      return next === prev ? prev : next;
     });
   }, [playlist]);
 
   const handlePrev = useCallback(() => {
     if (!playlist) return;
-    setCurrentIndex((prevIndex) => {
-      const next = Math.max(prevIndex - 1, 0);
-      return next === prevIndex ? prevIndex : next;
+    setCurrentIndex((prev) => {
+      const next = Math.max(prev - 1, 0);
+      return next === prev ? prev : next;
     });
   }, [playlist]);
 
@@ -216,7 +203,7 @@ function App() {
       }
 
       const client = await createRealtimeClient(payload, audioEl);
-      const listener: EventListener = (event: Event) => {
+      const listener: EventListener = (event) => {
         const textEvent = event as CustomEvent<{ text: string }>;
         const text = textEvent.detail?.text ?? '';
         if (!text) return;
@@ -233,7 +220,7 @@ function App() {
       setTranscripts([createEntry('system', 'Session initialised. Ready to deliver the induction script.')]);
       setIsSessionActive(true);
       setCurrentIndex(0);
-    } catch (error: unknown) {
+    } catch (error) {
       console.error('Failed to start realtime session', error);
       setSessionError(error instanceof Error ? error.message : String(error));
       if (clientRef.current) {
@@ -317,7 +304,7 @@ function App() {
     if (isSessionActive && clientRef.current) {
       clientRef.current
         .speak(item.line)
-        .catch((error: unknown) => console.error('Failed to speak line', error));
+        .catch((error) => console.error('Failed to speak line', error));
     }
   }, [currentIndex, isSessionActive, playlist]);
 
@@ -373,9 +360,9 @@ function App() {
                     <SelectValue placeholder="Select language" />
                   </SelectTrigger>
                   <SelectContent>
-                    {languageOptions.map((languageOption) => (
-                      <SelectItem key={languageOption.value} value={languageOption.value}>
-                        {languageOption.label}
+                    {SUPPORTED_LANGUAGES.map((language) => (
+                      <SelectItem key={language.value} value={language.value}>
+                        {language.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -388,7 +375,7 @@ function App() {
                 <Input
                   id="site"
                   value={siteInput}
-                  onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                  onChange={(event) => {
                     setSiteTouched(true);
                     setSiteInput(event.target.value);
                   }}

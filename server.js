@@ -12,16 +12,6 @@ const app = express();
 const port = process.env.PORT || 3000;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
-let fetchImpl = globalThis.fetch;
-
-async function fetchWithFallback(...args) {
-  if (!fetchImpl) {
-    const mod = await import('node-fetch');
-    fetchImpl = mod.default;
-  }
-  return fetchImpl(...args);
-}
-
 if (!OPENAI_API_KEY) {
   console.warn('Warning: OPENAI_API_KEY is not set. The /session endpoint will return an error.');
 }
@@ -38,16 +28,10 @@ app.get('/session', async (req, res) => {
   const lang = typeof req.query.lang === 'string' && req.query.lang ? req.query.lang : 'en';
   const siteParam = typeof req.query.site === 'string' && req.query.site ? req.query.site : 'Parratech – Kings Park Site';
 
-  const instructions = [
-    `You are the Induction Trainer. Speak ${lang}.`,
-    'For each step, read the provided line exactly. After each line, pause briefly.',
-    'When you want the next video to play, emit the tag [SHOW:NEXT] on its own line.',
-    'To replay, emit [REPLAY]. Do not invent content.',
-    `Site: ${siteParam}.`,
-  ].join(' ');
+  const instructions = `You are the Induction Trainer. Speak ${lang}. For each step, read the provided line exactly. After each line, pause briefly. When you want the next video to play, emit the tag [SHOW:NEXT] on its own line. To replay, emit [REPLAY]. Do not invent content. Site: ${siteParam}.`;
 
   try {
-    const response = await fetchWithFallback('https://api.openai.com/v1/realtime/sessions', {
+    const response = await fetch('https://api.openai.com/v1/realtime/sessions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
