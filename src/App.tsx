@@ -31,6 +31,28 @@ const createEntry = (role: TranscriptEntry['role'], text: string): TranscriptEnt
   timestamp: Date.now(),
 });
 
+const isYouTubeUrl = (url: string): boolean => /(?:youtu\.be\/|youtube\.com\/watch)/i.test(url);
+
+const getYouTubeEmbedUrl = (url: string): string | null => {
+  try {
+    const shortUrlMatch = url.match(/youtu\.be\/([^?&#]+)/i);
+    if (shortUrlMatch && shortUrlMatch[1]) {
+      return `https://www.youtube.com/embed/${shortUrlMatch[1]}?rel=0`;
+    }
+
+    const urlObj = new URL(url);
+    if (urlObj.hostname.toLowerCase().includes('youtube.com')) {
+      const videoId = urlObj.searchParams.get('v');
+      if (videoId) {
+        return `https://www.youtube.com/embed/${videoId}?rel=0`;
+      }
+    }
+  } catch (error) {
+    console.warn('Failed to derive YouTube embed URL', error);
+  }
+  return null;
+};
+
 function App() {
   const searchParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
   const initialLang = searchParams.get('lang') || SUPPORTED_LANGUAGES[0]?.value || 'en';
@@ -52,6 +74,20 @@ function App() {
   const clientListenerRef = useRef<EventListener | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const currentMedia = useMemo(() => {
+    if (!playlist) {
+      return { type: 'none' as const, url: '', embed: null };
+    }
+    const item = playlist.playlist[currentIndex];
+    if (!item) {
+      return { type: 'none' as const, url: '', embed: null };
+    }
+    if (isYouTubeUrl(item.src)) {
+      return { type: 'youtube' as const, url: item.src, embed: getYouTubeEmbedUrl(item.src) };
+    }
+    return { type: 'video' as const, url: item.src, embed: null };
+  }, [currentIndex, playlist]);
 
   useEffect(() => {
     setSiteTouched(false);
@@ -112,13 +148,18 @@ function App() {
 
   const handleReplay = useCallback(() => {
     if (!playlist) return;
-    const video = videoRef.current;
-    if (video) {
-      video.currentTime = 0;
-      void video.play().catch(() => undefined);
-    }
     const item = playlist.playlist[currentIndex];
-    if (item && isSessionActive && clientRef.current) {
+    if (!item) return;
+
+    if (!isYouTubeUrl(item.src)) {
+      const video = videoRef.current;
+      if (video) {
+        video.currentTime = 0;
+        void video.play().catch(() => undefined);
+      }
+    }
+
+    if (isSessionActive && clientRef.current) {
       clientRef.current
         .speak(item.line)
         .catch((error) => console.error('Failed to replay line', error));
@@ -294,10 +335,16 @@ function App() {
 
     const video = videoRef.current;
     if (video) {
-      video.src = item.src;
-      video.load();
-      if (isSessionActive) {
-        void video.play().catch(() => undefined);
+      if (currentMedia.type === 'video') {
+        video.src = currentMedia.url;
+        video.load();
+        if (isSessionActive) {
+          void video.play().catch(() => undefined);
+        }
+      } else {
+        video.pause();
+        video.removeAttribute('src');
+        video.load();
       }
     }
 
@@ -306,9 +353,10 @@ function App() {
         .speak(item.line)
         .catch((error) => console.error('Failed to speak line', error));
     }
-  }, [currentIndex, isSessionActive, playlist]);
+  }, [currentIndex, currentMedia, isSessionActive, playlist]);
 
   useEffect(() => {
+    if (currentMedia.type !== 'video') return;
     const video = videoRef.current;
     if (!video) return;
 
@@ -322,7 +370,7 @@ function App() {
     return () => {
       video.removeEventListener('ended', onEnded);
     };
-  }, [handleNext, isSessionActive]);
+  }, [currentMedia, handleNext, isSessionActive]);
 
   useEffect(() => {
     if (!playlist) return;
@@ -410,16 +458,34 @@ function App() {
             <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
               <div className="space-y-4">
                 <div className="aspect-video overflow-hidden rounded-lg border bg-black/90">
-                  <video
-                    ref={videoRef}
-                    controls
-                    className="h-full w-full bg-black"
-                    poster=""
-                    preload="metadata"
-                  >
-                    Your browser does not support HTML5 video.
-                  </video>
+                  {currentMedia.type === 'youtube' && currentMedia.embed ? (
+                    <iframe
+                      key={currentMedia.embed}
+                      src={currentMedia.embed}
+                      title="Induction clip"
+                      className="h-full w-full"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  ) : (
+                    <video
+                      ref={videoRef}
+                      controls
+                      className="h-full w-full bg-black"
+                      poster=""
+                      preload="metadata"
+                    >
+                      Your browser does not support HTML5 video.
+                    </video>
+                  )}
                 </div>
+                {currentMedia.type !== 'none' && (
+                  <div className="text-sm text-muted-foreground">
+                    <a href={currentMedia.url} target="_blank" rel="noreferrer" className="underline">
+                      Open this clip in a new tab
+                    </a>
+                  </div>
+                )}
                 <div className="rounded-lg border bg-card p-4 text-center text-xl font-semibold leading-relaxed shadow-sm min-h-[120px] flex items-center justify-center">
                   <span>{currentLine || 'Select a language and start the session to begin.'}</span>
                 </div>

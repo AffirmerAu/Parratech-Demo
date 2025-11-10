@@ -11,6 +11,7 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const port = process.env.PORT || 3000;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const REALTIME_MODEL = process.env.OPENAI_REALTIME_MODEL || 'gpt-4o-realtime-preview-2024-12-17';
 
 if (!OPENAI_API_KEY) {
   console.warn('Warning: OPENAI_API_KEY is not set. The /session endpoint will return an error.');
@@ -39,7 +40,7 @@ app.get('/session', async (req, res) => {
         'OpenAI-Beta': 'realtime=v1',
       },
       body: JSON.stringify({
-        model: 'gpt-realtime-mini',
+        model: REALTIME_MODEL,
         instructions,
         voice: 'verse',
         modalities: ['audio', 'text'],
