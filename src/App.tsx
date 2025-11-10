@@ -72,6 +72,7 @@ function App() {
   const [isStarting, setIsStarting] = useState(false);
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [transcripts, setTranscripts] = useState<TranscriptEntry[]>([]);
+  const [voiceLines, setVoiceLines] = useState<Record<string, string>>({});
 
   const clientRef = useRef<RealtimeClient | null>(null);
   const clientListenerRef = useRef<EventListener | null>(null);
@@ -145,6 +146,48 @@ function App() {
     };
   }, [lang, siteTouched]);
 
+  useEffect(() => {
+    let active = true;
+
+    fetch('/content/playlist.en.json')
+      .then(async (response) => {
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({}));
+          const message =
+            payload && typeof payload === 'object' && 'error' in payload
+              ? String((payload as { error?: string }).error)
+              : 'Unable to load English voice playlist.';
+          throw new Error(message || 'Unable to load English voice playlist.');
+        }
+        return (await response.json()) as Playlist;
+      })
+      .then((data) => {
+        if (!active) return;
+        const lines = data.playlist.reduce<Record<string, string>>((acc, item) => {
+          acc[item.id.toLowerCase()] = item.line;
+          return acc;
+        }, {});
+        setVoiceLines(lines);
+      })
+      .catch((error) => {
+        if (!active) return;
+        console.error('Failed to load English voice playlist', error);
+        setVoiceLines({});
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const getVoiceLine = useCallback(
+    (id: string) => {
+      const key = id.toLowerCase();
+      return voiceLines[key] ?? null;
+    },
+    [voiceLines]
+  );
+
   const appendTranscript = useCallback((role: TranscriptEntry['role'], text: string) => {
     setTranscripts((prev) => [...prev, createEntry(role, text)]);
   }, []);
@@ -163,11 +206,16 @@ function App() {
     }
 
     if (isSessionActive && clientRef.current) {
+      const voiceLine = getVoiceLine(item.id);
+      if (!voiceLine) {
+        console.warn(`No English voice line found for clip ${item.id}.`);
+        return;
+      }
       clientRef.current
-        .speak(item.line)
+        .speak(voiceLine)
         .catch((error) => console.error('Failed to replay line', error));
     }
-  }, [currentIndex, isSessionActive, playlist]);
+  }, [currentIndex, getVoiceLine, isSessionActive, playlist]);
 
   const handleNext = useCallback(() => {
     if (!playlist) return;
@@ -368,11 +416,16 @@ function App() {
     }
 
     if (isSessionActive && clientRef.current) {
+      const voiceLine = getVoiceLine(item.id);
+      if (!voiceLine) {
+        console.warn(`No English voice line found for clip ${item.id}.`);
+        return;
+      }
       clientRef.current
-        .speak(item.line)
+        .speak(voiceLine)
         .catch((error) => console.error('Failed to speak line', error));
     }
-  }, [currentIndex, currentMedia, isSessionActive, playlist]);
+  }, [currentIndex, currentMedia, getVoiceLine, isSessionActive, playlist]);
 
   useEffect(() => {
     if (currentMedia.type !== 'video') return;
