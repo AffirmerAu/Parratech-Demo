@@ -4,22 +4,22 @@
   "playlist": [
     {
       "id": "01_Introduction",
-      "src": "/videos/01_Introduction.mp4",
+      "src": "https://youtu.be/J91KQmaDmX8",
       "line": "Hello and welcome to Parratech’s Kings Park Site."
     },
     {
       "id": "03_Assembly_Area",
-      "src": "/videos/03_Assembly_Area.mp4",
+      "src": "https://youtu.be/2rqa40a7udY",
       "line": "If there is an emergency and evacuation is required, proceed quickly and calmly to your nearest emergency exit and head to the designated muster points."
     },
     {
       "id": "04_Assembly_Area_Primary",
-      "src": "/videos/04_Assembly_Area_Primary.mp4",
+      "src": "https://youtu.be/zmEFWIVqBpY",
       "line": "The Main muster point is located at Gate Entry B on the footpath."
     },
     {
       "id": "05_Assembly_Area_Secondary",
-      "src": "/videos/05_Assembly_Area_Secondary.mp4",
+      "src": "https://youtu.be/TOjaiVmC1Og",
       "line": "The Secondary muster point is located at the back site fence."
     }
   ]
