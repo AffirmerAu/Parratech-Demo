@@ -86,6 +86,7 @@ export class RealtimeClient extends EventTarget {
       headers: {
         Authorization: `Bearer ${this.clientSecret}`,
         'Content-Type': 'application/sdp',
+        'OpenAI-Beta': 'realtime=v1',
       },
       body: offer.sdp ?? '',
     });
