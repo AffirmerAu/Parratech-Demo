@@ -73,6 +73,9 @@ function App() {
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [transcripts, setTranscripts] = useState<TranscriptEntry[]>([]);
   const [voiceLines, setVoiceLines] = useState<Record<string, string>>({});
+  const [view, setView] = useState<'welcome' | 'session' | 'complete'>('welcome');
+  const [completedAt, setCompletedAt] = useState<number | null>(null);
+  const [shareStatus, setShareStatus] = useState<string | null>(null);
 
   const clientRef = useRef<RealtimeClient | null>(null);
   const clientListenerRef = useRef<EventListener | null>(null);
@@ -192,6 +195,42 @@ function App() {
     setTranscripts((prev) => [...prev, createEntry(role, text)]);
   }, []);
 
+  const cleanupSession = useCallback(
+    (options?: { resetTranscripts?: boolean }) => {
+      const { resetTranscripts = true } = options ?? {};
+
+      const client = clientRef.current;
+      if (client) {
+        if (clientListenerRef.current) {
+          client.removeEventListener('text', clientListenerRef.current);
+          clientListenerRef.current = null;
+        }
+        client.close();
+        clientRef.current = null;
+      }
+
+      const audio = audioRef.current;
+      if (audio) {
+        audio.pause();
+        audio.srcObject = null;
+      }
+
+      const video = videoRef.current;
+      if (video) {
+        video.pause();
+        video.currentTime = 0;
+      }
+
+      setIsSessionActive(false);
+      if (resetTranscripts) {
+        setTranscripts([]);
+      }
+      setCurrentIndex(0);
+      setCurrentLine('');
+    },
+    []
+  );
+
   const handleReplay = useCallback(() => {
     if (!playlist) return;
     const item = playlist.playlist[currentIndex];
@@ -286,6 +325,8 @@ function App() {
 
     setIsStarting(true);
     setSessionError(null);
+    setShareStatus(null);
+    setCompletedAt(null);
 
     try {
       const response = await fetch(`/session?lang=${encodeURIComponent(lang)}&site=${encodeURIComponent(site)}`);
@@ -326,55 +367,49 @@ function App() {
       setTranscripts([createEntry('system', 'Session initialised. Ready to deliver the induction script.')]);
       setIsSessionActive(true);
       setCurrentIndex(0);
+      setView('session');
     } catch (error) {
       console.error('Failed to start realtime session', error);
       setSessionError(error instanceof Error ? error.message : String(error));
-      if (clientRef.current) {
-        if (clientListenerRef.current) {
-          clientRef.current.removeEventListener('text', clientListenerRef.current);
-          clientListenerRef.current = null;
-        }
-        clientRef.current.close();
-        clientRef.current = null;
-      }
+      cleanupSession();
     } finally {
       setIsStarting(false);
     }
-  }, [appendTranscript, handleCommand, isSessionActive, isStarting, lang, playlist, siteInput]);
+  }, [appendTranscript, cleanupSession, handleCommand, isSessionActive, isStarting, lang, playlist, siteInput]);
 
   const handleStop = useCallback(() => {
-    const client = clientRef.current;
-    if (client) {
-      if (clientListenerRef.current) {
-        client.removeEventListener('text', clientListenerRef.current);
-        clientListenerRef.current = null;
+    cleanupSession();
+    setCompletedAt(null);
+    setShareStatus(null);
+    setView('welcome');
+  }, [cleanupSession]);
+
+  const handleFinish = useCallback(() => {
+    if (!isSessionActive) return;
+    cleanupSession({ resetTranscripts: false });
+    setCompletedAt(Date.now());
+    setShareStatus(null);
+    setView('complete');
+  }, [cleanupSession, isSessionActive]);
+
+  const handleShare = useCallback(async () => {
+    const siteName = siteInput || playlist?.site || 'Parratech Site Induction';
+    const message = `I just completed the ${siteName} course!`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ text: message });
+        setShareStatus('Shared successfully.');
+      } else if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(message);
+        setShareStatus('Message copied to clipboard.');
+      } else {
+        setShareStatus('Sharing is not supported in this browser.');
       }
-      client.close();
-      clientRef.current = null;
+    } catch (error) {
+      console.error('Failed to share completion', error);
+      setShareStatus('Unable to share right now.');
     }
-
-    const audio = audioRef.current;
-    if (audio) {
-      audio.pause();
-      audio.srcObject = null;
-    }
-
-    const video = videoRef.current;
-    if (video) {
-      video.pause();
-      video.currentTime = 0;
-    }
-
-    setIsSessionActive(false);
-    setTranscripts([]);
-    setCurrentIndex(0);
-    if (playlist) {
-      const firstLine = playlist.playlist[0]?.line ?? '';
-      setCurrentLine(firstLine);
-    } else {
-      setCurrentLine('');
-    }
-  }, [playlist]);
+  }, [playlist, siteInput]);
 
   useEffect(() => {
     return () => {
@@ -458,76 +493,139 @@ function App() {
 
   const isFirstStep = currentIndex === 0;
   const isLastStep = playlist ? currentIndex >= playlist.playlist.length - 1 : true;
+  const courseTitle = useMemo(() => siteInput || playlist?.site || 'Parratech Site Induction', [playlist, siteInput]);
+  const displayLine = isSessionActive ? currentLine : 'Start the session to begin.';
+  const formattedCompletion = useMemo(
+    () => (completedAt ? new Date(completedAt).toLocaleString() : null),
+    [completedAt]
+  );
 
   return (
     <div className="bg-muted/30 py-10">
-      <div className="container mx-auto max-w-6xl px-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Parratech Site Induction Player</CardTitle>
-            <CardDescription>
-              Stream the induction videos while the AI trainer narrates each scripted line and responds to voice controls.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-3">
-              <div className="space-y-2">
-                <label className="text-sm font-medium" htmlFor="language">
-                  Language
-                </label>
-                <Select value={lang} onValueChange={setLang} disabled={isSessionActive || isStarting}>
-                  <SelectTrigger id="language">
-                    <SelectValue placeholder="Select language" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SUPPORTED_LANGUAGES.map((language) => (
-                      <SelectItem key={language.value} value={language.value}>
-                        {language.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+      <div className="container mx-auto max-w-6xl px-4 space-y-6">
+        {view === 'welcome' && (
+          <Card>
+            <CardHeader>
+              <CardTitle>{courseTitle}</CardTitle>
+              <CardDescription>
+                Choose your preferred language and start the induction session when you are ready.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium" htmlFor="language">
+                    Language
+                  </label>
+                  <Select value={lang} onValueChange={setLang} disabled={isStarting}>
+                    <SelectTrigger id="language">
+                      <SelectValue placeholder="Select language" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SUPPORTED_LANGUAGES.map((language) => (
+                        <SelectItem key={language.value} value={language.value}>
+                          {language.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium" htmlFor="site">
+                    Site name
+                  </label>
+                  <Input
+                    id="site"
+                    value={siteInput}
+                    onChange={(event) => {
+                      setSiteTouched(true);
+                      setSiteInput(event.target.value);
+                    }}
+                    placeholder="Enter the site name"
+                    disabled={isStarting}
+                  />
+                </div>
               </div>
-              <div className="space-y-2 md:col-span-2">
-                <label className="text-sm font-medium" htmlFor="site">
-                  Site name
-                </label>
-                <Input
-                  id="site"
-                  value={siteInput}
-                  onChange={(event) => {
-                    setSiteTouched(true);
-                    setSiteInput(event.target.value);
-                  }}
-                  placeholder="Enter the site name"
-                  disabled={isSessionActive}
-                />
+
+              {playlistError && (
+                <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+                  {playlistError}
+                </div>
+              )}
+
+              {sessionError && (
+                <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+                  {sessionError}
+                </div>
+              )}
+
+              <div className="flex flex-wrap items-center gap-3">
+                <Button onClick={handleStart} disabled={!playlist || isStarting || loadingPlaylist}>
+                  {isStarting ? 'Starting…' : 'Start Session'}
+                </Button>
+                {loadingPlaylist && <span className="text-sm text-muted-foreground">Loading playlist…</span>}
               </div>
-            </div>
+            </CardContent>
+            <CardFooter className="flex flex-col items-start gap-2 text-sm text-muted-foreground">
+              <p>
+                The AI trainer will narrate each scripted line, while you follow along with the relevant video clip for the
+                site induction.
+              </p>
+            </CardFooter>
+          </Card>
+        )}
 
-            {playlistError && (
-              <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-                {playlistError}
+        {view === 'session' && (
+          <Card>
+            <CardHeader>
+              <CardTitle>{courseTitle}</CardTitle>
+              <CardDescription>
+                Stream the induction videos while the AI trainer narrates each scripted line and responds to voice
+                controls.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium" htmlFor="language-active">
+                    Language
+                  </label>
+                  <Select value={lang} onValueChange={setLang} disabled>
+                    <SelectTrigger id="language-active">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SUPPORTED_LANGUAGES.map((language) => (
+                        <SelectItem key={language.value} value={language.value}>
+                          {language.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium" htmlFor="site-active">
+                    Site name
+                  </label>
+                  <Input id="site-active" value={siteInput} disabled />
+                </div>
               </div>
-            )}
 
-            {sessionError && (
-              <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-                {sessionError}
+              {sessionError && (
+                <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+                  {sessionError}
+                </div>
+              )}
+
+              <div className="flex flex-wrap items-center gap-3">
+                <Button variant="secondary" onClick={handleStop}>
+                  Stop Session
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  Step {totalSteps > 0 ? currentIndex + 1 : 0} of {totalSteps}
+                </span>
               </div>
-            )}
 
-            <div className="flex flex-wrap items-center gap-3">
-              <Button onClick={handleStart} disabled={!playlist || isSessionActive || isStarting || loadingPlaylist}>
-                {isStarting ? 'Starting…' : 'Start Session'}
-              </Button>
-              <Button variant="secondary" onClick={handleStop} disabled={!isSessionActive}>
-                Stop Session
-              </Button>
-              {loadingPlaylist && <span className="text-sm text-muted-foreground">Loading playlist…</span>}
-            </div>
-
-            <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
               <div className="space-y-4">
                 <div className="aspect-video overflow-hidden rounded-lg border bg-black/90">
                   {currentMedia.type === 'youtube' && currentMedia.embed ? (
@@ -562,57 +660,94 @@ function App() {
                     </a>
                   </div>
                 )}
-                <div className="rounded-lg border bg-card p-4 text-center text-xl font-semibold leading-relaxed shadow-sm min-h-[120px] flex items-center justify-center">
-                  <span>{currentLine || 'Select a language and start the session to begin.'}</span>
+                <div className="flex min-h-[120px] items-center justify-center rounded-lg border bg-card p-4 text-center text-xl font-semibold leading-relaxed shadow-sm">
+                  <span>{displayLine}</span>
                 </div>
                 <div className="space-y-2">
-                  <Progress value={isSessionActive ? progressValue : 0} />
+                  <Progress value={progressValue} />
                   <div className="flex items-center justify-between text-sm text-muted-foreground">
-                    <span>
-                      Step {totalSteps > 0 ? currentIndex + 1 : 0} of {totalSteps}
-                    </span>
                     <span>{playlist?.playlist[currentIndex]?.id ?? '--'}</span>
+                    <span>{Math.round(progressValue)}% complete</span>
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-3">
-                  <Button variant="outline" onClick={handlePrev} disabled={!isSessionActive || isFirstStep}>
-                    Previous
-                  </Button>
-                  <Button variant="outline" onClick={handleReplay} disabled={!isSessionActive}>
-                    Replay
-                  </Button>
-                  <Button variant="outline" onClick={handleNext} disabled={!isSessionActive || isLastStep}>
-                    Next
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex flex-wrap gap-3">
+                    <Button variant="outline" onClick={handlePrev} disabled={isFirstStep}>
+                      Previous
+                    </Button>
+                    <Button variant="outline" onClick={handleReplay}>
+                      Replay
+                    </Button>
+                    <Button variant="outline" onClick={handleNext} disabled={isLastStep}>
+                      Next
+                    </Button>
+                  </div>
+                  <Button onClick={handleFinish} disabled={!isLastStep}>
+                    Finish
                   </Button>
                 </div>
               </div>
-              <div className="flex h-full flex-col rounded-lg border bg-card/80 p-4">
+            </CardContent>
+            <CardFooter className="flex flex-col items-start gap-2 text-sm text-muted-foreground">
+              <p>
+                When the voice assistant says <code>[SHOW:NEXT]</code>, the next clip will begin immediately. Use <code>[REPLAY]</code> to
+                restart the current clip or <code>[SHOW:ID]</code> to jump to a specific segment.
+              </p>
+            </CardFooter>
+          </Card>
+        )}
+
+        {view === 'complete' && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Course complete!</CardTitle>
+              <CardDescription>
+                You have successfully finished the {courseTitle}. Share your accomplishment below.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-2 rounded-lg border bg-card/70 p-4">
+                <p className="text-lg font-semibold">Congratulations!</p>
+                <p className="text-sm text-muted-foreground">
+                  Great work completing the induction experience. Feel free to share your result with your team.
+                </p>
+                {formattedCompletion && (
+                  <p className="text-sm text-muted-foreground">Completed on {formattedCompletion}</p>
+                )}
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                <Button onClick={handleShare}>Share completion</Button>
+                <Button variant="outline" onClick={handleStop}>
+                  Start a new session
+                </Button>
+              </div>
+              {shareStatus && <p className="text-sm text-muted-foreground">{shareStatus}</p>}
+
+              <div className="space-y-3">
                 <h3 className="text-lg font-semibold">Transcript</h3>
-                <div className="mt-3 flex-1 space-y-3 overflow-y-auto rounded-md bg-background/60 p-3 text-sm">
-                  {transcripts.length === 0 && (
-                    <p className="text-muted-foreground">The transcript will appear here once the session starts.</p>
-                  )}
-                  {transcripts.map((entry) => (
-                    <div key={entry.id} className="space-y-1">
-                      <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground">
-                        <span>{entry.role === 'trainer' ? 'Trainer' : 'System'}</span>
-                        <span className="text-[10px] text-muted-foreground/80">
-                          {new Date(entry.timestamp).toLocaleTimeString()}
-                        </span>
+                <div className="space-y-3 rounded-lg border bg-background/80 p-4 text-sm">
+                  {transcripts.length === 0 ? (
+                    <p className="text-muted-foreground">No transcript entries were recorded for this session.</p>
+                  ) : (
+                    transcripts.map((entry) => (
+                      <div key={entry.id} className="space-y-1">
+                        <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground">
+                          <span>{entry.role === 'trainer' ? 'Trainer' : 'System'}</span>
+                          <span className="text-[10px] text-muted-foreground/80">
+                            {new Date(entry.timestamp).toLocaleTimeString()}
+                          </span>
+                        </div>
+                        <p className="rounded-md bg-muted/60 p-2 text-foreground">{entry.text}</p>
                       </div>
-                      <p className="rounded-md bg-muted/60 p-2 text-foreground">{entry.text}</p>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </div>
-            </div>
-          </CardContent>
-          <CardFooter className="flex flex-col items-start gap-2 text-sm text-muted-foreground">
-            <p>
-              When the voice assistant says <code>[SHOW:NEXT]</code>, the next clip will begin immediately. Use <code>[REPLAY]</code> to restart the current clip or <code>[SHOW:ID]</code> to jump to a specific segment.
-            </p>
-          </CardFooter>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
+
         <audio ref={audioRef} className="hidden" autoPlay />
       </div>
     </div>
