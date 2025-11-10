@@ -17,6 +17,8 @@ import { parse, type CommandAction } from './commands';
 
 const SUPPORTED_LANGUAGES: { value: string; label: string }[] = [
   { value: 'en', label: 'English (Australia)' },
+  { value: 'zh', label: 'Chinese' },
+  { value: 'ko', label: 'Korean' },
 ];
 
 const createId = () =>
@@ -37,14 +39,15 @@ const getYouTubeEmbedUrl = (url: string): string | null => {
   try {
     const shortUrlMatch = url.match(/youtu\.be\/([^?&#]+)/i);
     if (shortUrlMatch && shortUrlMatch[1]) {
-      return `https://www.youtube.com/embed/${shortUrlMatch[1]}?rel=0`;
+      const videoId = shortUrlMatch[1];
+      return `https://www.youtube.com/embed/${videoId}?rel=0&autoplay=1&loop=1&playlist=${videoId}&mute=1`;
     }
 
     const urlObj = new URL(url);
     if (urlObj.hostname.toLowerCase().includes('youtube.com')) {
       const videoId = urlObj.searchParams.get('v');
       if (videoId) {
-        return `https://www.youtube.com/embed/${videoId}?rel=0`;
+        return `https://www.youtube.com/embed/${videoId}?rel=0&autoplay=1&loop=1&playlist=${videoId}&mute=1`;
       }
     }
   } catch (error) {
@@ -352,9 +355,11 @@ function App() {
       if (currentMedia.type === 'video') {
         video.src = currentMedia.url;
         video.load();
-        if (isSessionActive) {
-          void video.play().catch(() => undefined);
-        }
+        video.loop = true;
+        video.autoplay = true;
+        video.muted = true;
+        video.playsInline = true;
+        void video.play().catch(() => undefined);
       } else {
         video.pause();
         video.removeAttribute('src');
@@ -488,6 +493,10 @@ function App() {
                       className="h-full w-full bg-black"
                       poster=""
                       preload="metadata"
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
                     >
                       Your browser does not support HTML5 video.
                     </video>
