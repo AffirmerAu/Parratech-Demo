@@ -36,6 +36,7 @@ app.get('/session', async (req, res) => {
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${OPENAI_API_KEY}`,
+        'OpenAI-Beta': 'realtime=v1',
       },
       body: JSON.stringify({
         model: 'gpt-realtime-mini',
