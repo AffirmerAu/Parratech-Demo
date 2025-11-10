@@ -1,0 +1,26 @@
+{
+  "site": "Parratech – Kings Park Site",
+  "locale": "ko-KR",
+  "playlist": [
+    {
+      "id": "01_Introduction",
+      "src": "https://youtu.be/J91KQmaDmX8",
+      "line": "안녕하세요. Parratech의 Kings Park 현장에 오신 것을 환영합니다."
+    },
+    {
+      "id": "03_Assembly_Area",
+      "src": "https://youtu.be/2rqa40a7udY",
+      "line": "비상 상황으로 대피가 필요할 경우, 신속하고 침착하게 가장 가까운 비상구로 이동하여 지정된 집결지로 가십시오."
+    },
+    {
+      "id": "04_Assembly_Area_Primary",
+      "src": "https://youtu.be/zmEFWIVqBpY",
+      "line": "주 집결지는 인도 쪽 B 게이트 입구에 있습니다."
+    },
+    {
+      "id": "05_Assembly_Area_Secondary",
+      "src": "https://youtu.be/TOjaiVmC1Og",
+      "line": "보조 집결지는 현장 후방 울타리 쪽에 있습니다."
+    }
+  ]
+}

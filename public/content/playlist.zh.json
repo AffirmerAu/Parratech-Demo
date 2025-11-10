@@ -1,0 +1,26 @@
+{
+  "site": "Parratech – Kings Park Site",
+  "locale": "zh-CN",
+  "playlist": [
+    {
+      "id": "01_Introduction",
+      "src": "https://youtu.be/J91KQmaDmX8",
+      "line": "您好，欢迎来到 Parratech 的 Kings Park 工地。"
+    },
+    {
+      "id": "03_Assembly_Area",
+      "src": "https://youtu.be/2rqa40a7udY",
+      "line": "如果发生紧急情况并需要撤离，请迅速且冷静地前往最近的紧急出口，并到指定的集合点集合。"
+    },
+    {
+      "id": "04_Assembly_Area_Primary",
+      "src": "https://youtu.be/zmEFWIVqBpY",
+      "line": "主要集合点位于人行道上的 B 门入口处。"
+    },
+    {
+      "id": "05_Assembly_Area_Secondary",
+      "src": "https://youtu.be/TOjaiVmC1Og",
+      "line": "次要集合点位于工地后方的围栏旁。"
+    }
+  ]
+}
