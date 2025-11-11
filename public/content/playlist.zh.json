@@ -1,0 +1,11 @@
+{
+  "site": "Parratech – 金斯公园现场",
+  "locale": "zh-CN",
+  "playlist": [
+    {
+      "id": "parratech_video",
+      "src": "/videos/Parratech Video.mp4",
+      "line": "欢迎观看 Parratech 金斯公园现场的入职视频。"
+    }
+  ]
+}

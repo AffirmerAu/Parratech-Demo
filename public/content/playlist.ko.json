@@ -1,0 +1,11 @@
+{
+  "site": "Parratech – 킹스 파크 현장",
+  "locale": "ko-KR",
+  "playlist": [
+    {
+      "id": "parratech_video",
+      "src": "/videos/Parratech Video.mp4",
+      "line": "Parratech 킹스 파크 현장 소개 영상을 시청해 주세요."
+    }
+  ]
+}
