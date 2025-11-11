@@ -211,8 +211,6 @@ function App() {
       }
 
       audioEl.src = audioSource;
-      audioEl.preload = 'auto';
-      audioEl.muted = false;
       audioEl.load();
 
       setIsSessionActive(true);
@@ -290,24 +288,12 @@ function App() {
 
     const audio = audioRef.current;
     if (audio) {
-      if (!isSessionActive) {
-        audio.pause();
-        if (audio.readyState > 0) {
-          audio.currentTime = 0;
-        }
-      } else {
-        if (audio.readyState > 0) {
-          audio.currentTime = 0;
-        }
-        audio.muted = false;
-      }
+      audio.pause();
+      audio.currentTime = 0;
     }
 
     if (isSessionActive) {
-      const audioReady = audio ? audio.readyState > 0 : true;
-      if (audioReady) {
-        void playMediaInSync(true);
-      }
+      void playMediaInSync(true);
     }
   }, [currentIndex, currentMedia, isSessionActive, playMediaInSync, playlist]);
 
@@ -479,7 +465,7 @@ function App() {
             </p>
           </CardFooter>
         </Card>
-        <audio ref={audioRef} className="hidden" preload="auto" />
+        <audio ref={audioRef} className="hidden" />
       </div>
     </div>
   );
